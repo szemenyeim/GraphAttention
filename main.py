@@ -1,5 +1,6 @@
 from graphTrain import *
 from sceneEval import *
+from sceneTrain import *
 import argparse
 
 
@@ -16,13 +17,18 @@ if __name__ == '__main__':
                         help="Path to database")
     parser.add_argument("--save", type=str, default="checkpoints/",
                         help="Path to save to")
-    parser.add_argument("--evalScene", action="store_true", default=True,
+    parser.add_argument("--evalScene", action="store_true", default=False,
+                        help="Evaluate classifiers on the scene datasets")
+    parser.add_argument("--trainScene", action="store_true", default=False,
                         help="Evaluate classifiers on the scene datasets")
 
     args = parser.parse_args()
 
     if args.evalScene:
         evalScenes(args.root,args.save)
+        exit(0)
+    elif args.trainScene:
+        trainScenes(args.root,args.save)
         exit(0)
 
     trainer = Trainer(args.root,args.save, args.iters)
