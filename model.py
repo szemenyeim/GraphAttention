@@ -4,15 +4,20 @@ import math
 import torch.nn.functional as F
 
 class GraphClassifier(nn.Module):
-    def __init__(self,baseFeatNum, edgeFeatNum):
+    def __init__(self,baseFeatNum, edgeFeatNum, nClass, dropout=0.0):
         super().__init__()
         self.baseFeatNum = baseFeatNum
 
         self.Features = SingleHeadedGraphAttention(12,1,baseFeatNum,baseFeatNum,edgeFeatNum)
-        self.Classifier = nn.Linear(baseFeatNum*2,5)
+        self.do = None
+        if dropout > 0.0:
+            self.do = nn.Dropout(dropout)
+        self.Classifier = nn.Linear(baseFeatNum*2,nClass)
 
     def forward(self, nodes, edges, distances, mask):
         f = self.Features(nodes,edges,distances,mask)
+        if self.do is not None:
+            f = self.do(f)
         out = self.Classifier(f)
         return out
 
@@ -67,7 +72,7 @@ class SingleHeadedGraphAttention(nn.Module):
 
         vals = (weights2*V).sum(-2)
 
-        vals = self.Trans(torch.tanh(vals))
+        vals = torch.relu(self.Trans(torch.tanh(vals)))
         valsshape = vals.shape
         vals = vals.view((-1,valsshape[-1]))
         vals = self.bn(vals)
