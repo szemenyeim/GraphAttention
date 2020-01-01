@@ -3,9 +3,33 @@ import numpy as np
 import torch.utils.data as data
 import glob
 import itertools
+import re
 import os.path as osp
 
 flatten = lambda l: [item for sublist in l for item in sublist]
+
+def tryint(s):
+    try:
+        return int(s)
+    except:
+        return s
+
+def alphanum_key(s):
+    """ Turn a string into a list of string and number chunks.
+        "z23a" -> ["z", 23, "a"]
+    """
+    return [ tryint(c) for c in re.split('([0-9]+)', s) ]
+
+def csv2Np(file,maxLen=0):
+    with open(file) as f:
+        rows = f.read().split('\n')[:-1]
+        vals = [row.split(',')[:-1] for row in rows]
+        lens = [len(row) for row in vals]
+        if maxLen == 0:
+            maxLen = max(lens)
+        vals = [row + ['0',]*(maxLen-length) for row,length in zip(vals,lens) if length > 0]
+        data = np.array(vals).astype('float')
+        np.savetxt(file,data,delimiter=',')
 
 def stack_padding(l):
     return np.column_stack(list(itertools.zip_longest(*l, fillvalue=0)))
@@ -29,16 +53,19 @@ class GraphDataSet(data.Dataset):
         if scene:
             nodeFiles = ["sceneNodes.csv"]
             edgeFiles = ["sceneEdges.csv"]
-            labels = np.genfromtxt(osp.join(path,"sceneLabels.csv"),delimiter=',')
+            #csv2Np(osp.join(path,"sceneLabels.csv"))
+            labels = np.genfromtxt(osp.join(path,"sceneLabels.csv"),delimiter=',', filling_values=0)
             self.M = torch.tensor(labels == 0).bool()
             self.L = torch.tensor(labels-1).long()
             self.L[self.L < 0] = 1
         else:
-            nodeFiles = sorted(glob.glob1(path,"*nodes.csv"))[:-1]
-            edgeFiles = sorted(glob.glob1(path,"*edges.csv"))[:-1]
+            nodeFiles = sorted(glob.glob1(path,"*nodes.csv"))
+            edgeFiles = sorted(glob.glob1(path,"*edges.csv"))
 
-        nodes = [np.genfromtxt(osp.join(path,file),delimiter=',') for file in nodeFiles]
-        edges = [np.genfromtxt(osp.join(path,file),delimiter=',') for file in edgeFiles]
+        #[csv2Np(osp.join(path,file),240) for file in nodeFiles] #84,60
+        #[csv2Np(osp.join(path,file),800) for file in edgeFiles] #98,50
+        nodes = [np.genfromtxt(osp.join(path,file),delimiter=',', filling_values=0) for file in nodeFiles]
+        edges = [np.genfromtxt(osp.join(path,file),delimiter=',', filling_values=0) for file in edgeFiles]
         labels = [nodes[i].shape[0] for i in range(len(nodes))]
 
         nodes = flatten(nodes)
@@ -52,6 +79,8 @@ class GraphDataSet(data.Dataset):
             self.M = torch.logical_not(self.N.sum(2).bool())
 
         nodeCnts = (self.N.shape[1]-self.M.sum(1).int()).numpy()
+
+        self.nClass = self.L.max()+1
 
         edges = np.stack(flatten(edges))
         edges = edges.reshape((edges.shape[0],-1,eFeatures+1))
