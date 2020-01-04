@@ -3,6 +3,7 @@ from model import *
 import os
 import csv
 import progressbar
+import time
 
 def evalScenes(dataroot,saveroot):
 
@@ -10,6 +11,9 @@ def evalScenes(dataroot,saveroot):
                    key=alphanum_key)
 
     accuracies = []
+    times = []
+
+    cuda = True
 
     for dir in dirs:
 
@@ -36,7 +40,10 @@ def evalScenes(dataroot,saveroot):
         net.Features.load_state_dict(feat)
         net.Classifier.load_state_dict(classifier)
 
-        test_loader = torch.utils.data.DataLoader(dataset, batch_size=int(params['batch_size']))
+        if not cuda:
+            net = net.cpu()
+
+        test_loader = torch.utils.data.DataLoader(dataset, batch_size=1)#int(params['batch_size']))
 
         criterion = nn.CrossEntropyLoss(reduction='none')
 
@@ -52,10 +59,13 @@ def evalScenes(dataroot,saveroot):
             # Create progress bar
             bar = progressbar.ProgressBar(0, len(test_loader), redirect_stdout=False)
 
+            start = time.clock()
+
             # Epoch loop
             for i, (inputs, labels) in enumerate(test_loader, 0):
-                inputs = [input.cuda() for input in inputs]
-                labels = labels.cuda().view(-1)
+                if cuda:
+                    inputs = [input.cuda() for input in inputs]
+                    labels = labels.cuda().view(-1)
                 masks = torch.logical_not(inputs[-1].view(-1))
 
                 # forward
@@ -74,6 +84,10 @@ def evalScenes(dataroot,saveroot):
             # Finish progress bar
             bar.finish()
 
+            end = time.clock()
+
+            times.append((end-start)/total)
+
             # print and plot statistics
             val_loss = running_loss / len(test_loader)
             val_corr = correct / total * 100
@@ -86,3 +100,5 @@ def evalScenes(dataroot,saveroot):
         accuracies.append(corr.item())
 
     np.savetxt("sceneClassRes.csv",np.array(accuracies),delimiter=',')
+    print(times)
+    print(np.mean(np.array(times)))
