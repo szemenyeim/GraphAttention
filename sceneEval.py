@@ -65,7 +65,8 @@ def evalScenes(dataroot,saveroot):
             for i, (inputs, labels) in enumerate(test_loader, 0):
                 if cuda:
                     inputs = [input.cuda() for input in inputs]
-                    labels = labels.cuda().view(-1)
+                    labels = labels.cuda()
+                labels = labels.view(-1)
                 masks = torch.logical_not(inputs[-1].view(-1))
 
                 # forward
@@ -86,7 +87,7 @@ def evalScenes(dataroot,saveroot):
 
             end = time.clock()
 
-            times.append((end-start)/total)
+            times.append((end-start)/float(len(test_loader)))
 
             # print and plot statistics
             val_loss = running_loss / len(test_loader)
@@ -100,5 +101,5 @@ def evalScenes(dataroot,saveroot):
         accuracies.append(corr.item())
 
     np.savetxt("sceneClassRes.csv",np.array(accuracies),delimiter=',')
-    print(times)
+    #print(times)
     print(np.mean(np.array(times)))
